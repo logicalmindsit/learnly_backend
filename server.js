@@ -9,6 +9,7 @@ import { verifyToken } from "./src/Middleware/authMiddleware.js";
 import courses from "./src/Routes/Course-routes/Course-routes.js";
 import userRoutes from "./src/Routes/users-routes/User-Routes.js";
 import Payment from "./src/Routes/Payment-Routes/Payment-Routes.js"
+import Purchasedcourse from "./src/Routes/Purchased-routes/Purchased-routs.js"
 
 
 import ExamQuestion from './src/Routes/Exan-Question-Routes.js/Exam-Question-Routes.js';
@@ -33,6 +34,7 @@ app.use('/', courses);
 app.use('/', Payment);
 
 app.use("/",ExamQuestion)
+app.use('/', Purchasedcourse);
 
 
 // Start the server
