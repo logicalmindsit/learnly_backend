@@ -3,8 +3,7 @@ import ExamQuestion from "../../Models/Exam-Model/Exam-Question-Model.js";
 import ExamAttempt from "../../Models/Exam-Model/User-Submit-Model.js";
 import Course from "../../Models/Course-Model/Course-model.js";
 import mongoose from "mongoose";
-import User from "../../Models/User-Model/User-Model.js"
-
+import User from "../../Models/User-Model/User-Model.js";
 
 export const submitExamAttempt = async (req, res) => {
   try {
@@ -15,7 +14,8 @@ export const submitExamAttempt = async (req, res) => {
     if (!examId || !courseId || !chapterTitle || !Array.isArray(answers)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid request. Please provide examId, courseId, chapterTitle, and answers array."
+        message:
+          "Invalid request. Please provide examId, courseId, chapterTitle, and answers array.",
       });
     }
 
@@ -24,7 +24,7 @@ export const submitExamAttempt = async (req, res) => {
     if (!course) {
       return res.status(404).json({
         success: false,
-        message: "Course not found. Please verify the courseId."
+        message: "Course not found. Please verify the courseId.",
       });
     }
 
@@ -33,7 +33,7 @@ export const submitExamAttempt = async (req, res) => {
     if (!exam) {
       return res.status(404).json({
         success: false,
-        message: "Exam not found. Please verify the examId."
+        message: "Exam not found. Please verify the examId.",
       });
     }
 
@@ -41,7 +41,7 @@ export const submitExamAttempt = async (req, res) => {
     if (exam.chapterTitle !== chapterTitle) {
       return res.status(400).json({
         success: false,
-        message: `Chapter mismatch. Exam belongs to chapter "${exam.chapterTitle}", but got "${chapterTitle}".`
+        message: `Chapter mismatch. Exam belongs to chapter "${exam.chapterTitle}", but got "${chapterTitle}".`,
       });
     }
 
@@ -50,53 +50,59 @@ export const submitExamAttempt = async (req, res) => {
       userId,
       courseId,
       chapterTitle,
-      examId
+      examId,
     });
 
     if (existingAttempt) {
       return res.status(409).json({
         success: false,
-        message: "You have already submitted this exam. Re-attempt is not allowed."
+        message:
+          "You have already submitted this exam. Re-attempt is not allowed.",
       });
     }
-const user = await User.findById(userId).lean();
+    const user = await User.findById(userId).lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
 
-
-
-      
     // 6. Process Answers
     let obtainedMarks = 0;
-    const detailedAnswers = answers.map(userAnswer => {
-      const originalQuestion = exam.examQuestions.find(q => q.question === userAnswer.question);
-      if (!originalQuestion) return null;
+    const detailedAnswers = answers
+      .map((userAnswer) => {
+        const originalQuestion = exam.examQuestions.find(
+          (q) => q.question === userAnswer.question
+        );
+        if (!originalQuestion) return null;
 
-      const isCorrect = originalQuestion.correctAnswer === userAnswer.selectedAnswer;
-      const marksAwarded = isCorrect ? originalQuestion.marks : 0;
+        const isCorrect =
+          originalQuestion.correctAnswer === userAnswer.selectedAnswer;
+        const marksAwarded = isCorrect ? originalQuestion.marks : 0;
 
-      if (isCorrect) obtainedMarks += marksAwarded;
+        if (isCorrect) obtainedMarks += marksAwarded;
 
-      return {
-        question: userAnswer.question,
-        selectedAnswer: userAnswer.selectedAnswer,
-        isCorrect,
-        marksAwarded
-      };
-    }).filter(Boolean); // Remove any unanswered or invalid questions
+        return {
+          question: userAnswer.question,
+          selectedAnswer: userAnswer.selectedAnswer,
+          isCorrect,
+          marksAwarded,
+        };
+      })
+      .filter(Boolean); // Remove any unanswered or invalid questions
 
     if (detailedAnswers.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "No valid answers submitted. Please ensure your answers match the questions provided in the exam."
+        message:
+          "No valid answers submitted. Please ensure your answers match the questions provided in the exam.",
       });
     }
 
     // 7. Save Exam Attempt
     const attempt = new ExamAttempt({
       userId,
-      MotherId: user.CourseMotherId || null, // Ensure CourseMotherId is included 
+      CourseMotherId: course.CourseMotherId || null, // Ensure CourseMotherId is included
       studentRegisterNumber: user.studentRegisterNumber || null,
       email: user.email || null,
       username: user.username || null,
@@ -106,7 +112,7 @@ const user = await User.findById(userId).lean();
       examId,
       answers: detailedAnswers,
       totalMarks: exam.totalMarks,
-      obtainedMarks
+      obtainedMarks,
     });
 
     await attempt.save();
@@ -118,67 +124,60 @@ const user = await User.findById(userId).lean();
       data: {
         totalMarks: exam.totalMarks,
         obtainedMarks,
-        correctCount: detailedAnswers.filter(a => a.isCorrect).length,
-        wrongCount: detailedAnswers.filter(a => !a.isCorrect).length
-      }
+        correctCount: detailedAnswers.filter((a) => a.isCorrect).length,
+        wrongCount: detailedAnswers.filter((a) => !a.isCorrect).length,
+      },
     });
-
   } catch (error) {
     console.error("Error submitting exam attempt:", error);
     return res.status(500).json({
       success: false,
-      message: "Something went wrong while submitting the exam. Please try again later.",
-      error: error.message
+      message:
+        "Something went wrong while submitting the exam. Please try again later.",
+      error: error.message,
     });
   }
 };
 
-
 export const getUserExamAttempts = async (req, res) => {
   try {
-    const userId = req.userId; 
+    const userId = req.userId;
     const { courseId, examId, page = 1, limit = 10 } = req.query;
 
     if (courseId && !mongoose.Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid courseId."
+        message: "Invalid courseId.",
       });
     }
     if (examId && !mongoose.Types.ObjectId.isValid(examId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid examId."
+        message: "Invalid examId.",
       });
     }
 
-   
     let query = { userId };
     if (courseId) query.courseId = courseId;
     if (examId) query.examId = examId;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
-    const pageFinal = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum; 
-    const limitFinal = isNaN(limitNum) || limitNum < 1 ? 10 : limitNum; 
-
+    const pageFinal = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum;
+    const limitFinal = isNaN(limitNum) || limitNum < 1 ? 10 : limitNum;
 
     const skip = (pageFinal - 1) * limitFinal;
 
-
     const attempts = await ExamAttempt.find(query)
-      .sort({ attemptedAt: -1 }) 
+      .sort({ attemptedAt: -1 })
       .skip(skip)
-      .limit(limitFinal) 
-      .lean(); 
-
+      .limit(limitFinal)
+      .lean();
 
     const totalCount = await ExamAttempt.countDocuments(query);
 
-
     let message;
     if (totalCount === 0) {
-
       if (examId) {
         message = "You have not attempted this exam.";
       } else if (courseId) {
@@ -187,7 +186,6 @@ export const getUserExamAttempts = async (req, res) => {
         message = "You have not attempted any exams yet.";
       }
     } else if (attempts.length === 0) {
-
       message = "No more exam attempts available for this page.";
     } else {
       message = "Exam attempts retrieved successfully.";
@@ -201,15 +199,15 @@ export const getUserExamAttempts = async (req, res) => {
         currentPage: pageFinal,
         totalPages: Math.ceil(totalCount / limitFinal),
         totalItems: totalCount,
-        itemsPerPage: limitFinal
-      }
+        itemsPerPage: limitFinal,
+      },
     });
   } catch (error) {
     console.error("Error fetching exam attempts:", error);
     return res.status(500).json({
       success: false,
       message: "Something went wrong while fetching exam attempts.",
-      error: error.message
+      error: error.message,
     });
   }
 };
