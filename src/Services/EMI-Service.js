@@ -1,5 +1,5 @@
 // Services/emiService.js - EMI Management
-import { sendNotification } from "../notification/EMI-Notification.js";
+import { sendNotification } from "../Notification/EMI-Notification.js";
 import EMIPlan from "../Models/Emi-Plan/Emi-Plan-Model.js";
 import User from "../Models/User-Model/User-Model.js";
 
