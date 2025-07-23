@@ -1,3 +1,4 @@
+//Models/User-Model/User-Model.js
 import { Schema, model } from "mongoose";
 
 const userSchema = new Schema(
@@ -7,7 +8,7 @@ const userSchema = new Schema(
       unique: true,
       sparse: true, // Allows multiple documents to have null for this field if it's not set
       default: null,
-    }, //IRMVM22B1001
+    },
     //1st section
     email: {
       type: String,
@@ -88,6 +89,26 @@ const userSchema = new Schema(
     forgotPasswordOtp: { type: String, default: undefined },
     forgotPasswordOtpExpiresAt: { type: Date, default: undefined },
     forgotPasswordOtpVerified: { type: Boolean, default: false },
+
+    //User EMI- Details
+    enrolledCourses: [
+      {
+        course: {
+          type: Schema.Types.ObjectId,
+          ref: "Course",
+        },
+        coursename: String,
+        emiPlan: {
+          type: Schema.Types.ObjectId,
+          ref: "EMIPlan",
+        },
+        accessStatus: {
+          type: String,
+          enum: ["active", "locked"],
+          default: "active",
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -96,7 +117,7 @@ userSchema.pre("save", async function (next) {
   if (!this.isNew || this.studentRegisterNumber) return next();
 
   try {
-    const COMPANY_CODE = "IRMVM";
+    const COMPANY_CODE = "GKVK";
     const currentYear = new Date().getFullYear() % 100;
     const yearPrefix = `${COMPANY_CODE}${currentYear}`;
 

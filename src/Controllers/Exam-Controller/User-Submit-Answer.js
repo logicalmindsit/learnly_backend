@@ -95,7 +95,8 @@ const user = await User.findById(userId).lean();
 
     // 7. Save Exam Attempt
     const attempt = new ExamAttempt({
-        userId,
+      userId,
+      MotherId: user.CourseMotherId || null, // Ensure CourseMotherId is included 
       studentRegisterNumber: user.studentRegisterNumber || null,
       email: user.email || null,
       username: user.username || null,
@@ -212,7 +213,3 @@ export const getUserExamAttempts = async (req, res) => {
     });
   }
 };
-
-
-
-

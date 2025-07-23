@@ -1,3 +1,4 @@
+//server.js
 import express from 'express';
 import dotenv from "dotenv";
 import connectDB from './src/DB/db.js';
@@ -11,8 +12,8 @@ import userRoutes from "./src/Routes/users-routes/User-Routes.js";
 import Payment from "./src/Routes/Payment-Routes/Payment-Routes.js"
 import Purchasedcourse from "./src/Routes/Purchased-routes/Purchased-routs.js"
 
-
 import ExamQuestion from './src/Routes/Exan-Question-Routes.js/Exam-Question-Routes.js';
+import './src/Services/EMI-Cron.js';
 
 const app = express();
 const PORT =  process.env.PORT || 8000;

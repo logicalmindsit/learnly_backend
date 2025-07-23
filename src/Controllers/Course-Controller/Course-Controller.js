@@ -1,3 +1,4 @@
+//Controlllers/Course-Controlller/Course-Controller.js
 import Course from "../../Models/Course-Model/Course-model.js";
 import Payment from "../../Models/Payment-Model/Payment-Model.js"
 import ExamQuestion from "../../Models/Exam-Model/Exam-Question-Model.js"
@@ -16,6 +17,7 @@ export const getCoursesForUserView = async (req, res) => {
   try {
     // Only select fields needed for card/grid display
     const courses = await Course.find({}, {
+      CourseMotherId: 1,
       coursename: 1,
       category: 1,
       courseduration: 1,
@@ -75,6 +77,7 @@ export const getCourseDetailWithPaymentCheck = async (req, res) => {
       // Return basic details for non-paying users
       const basicDetails = {
         _id: course._id,
+        CourseMotherId: course.CourseMotherId,
         coursename: course.coursename,
         category: course.category,
         courseduration: course.courseduration,
@@ -104,7 +107,6 @@ export const getCourseDetailWithPaymentCheck = async (req, res) => {
   }
 };
 
-
 export const getCourseContent = async (req, res) => {
   try {
     const userId = req.userId;
@@ -122,7 +124,8 @@ export const getCourseContent = async (req, res) => {
     // Get course content and name
     const course = await Course.findById(courseId, { 
       chapters: 1,
-      coursename: 1
+      coursename: 1,
+      CourseMotherId: 1
     });
 
     if (!course) {
@@ -177,7 +180,10 @@ export const getCourseContent = async (req, res) => {
 
     return res.status(200).json({ 
       success: true,
+      message: "Course content fetched successfully",
       data: chaptersWithExams,
+      CourseMotherId: course.CourseMotherId,
+      coursename: course.coursename,
       meta
     });
   } catch (error) {
@@ -189,6 +195,3 @@ export const getCourseContent = async (req, res) => {
     });
   }
 };
-
-
-

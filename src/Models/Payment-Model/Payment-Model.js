@@ -1,3 +1,4 @@
+//Models/Payment-Model/Payment-Model.js
 import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema(
@@ -22,8 +23,11 @@ const paymentSchema = new mongoose.Schema(
     mobile: { type: String, index: true },
 
     // Course Information
+    CourseMotherId: { type: String, required: true, unique: true },
     courseName: { type: String, required: true },
     // Payment Information
+    paymentType: {type: String,enum: ["full", "emi", "emi_overdue"],required: true},
+    emiDueDay: {type: Number,min: 1,max: 31},
     amount: { type: Number, required: true,
     min: 0,set: v => parseFloat(v.toFixed(2))
     },
@@ -34,7 +38,7 @@ const paymentSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "completed", "failed", "refunded"],
+      enum: ["pending", "completed", "failed", "cancelled"],
       default: "pending",
       index: true
     },
@@ -89,14 +93,6 @@ const paymentSchema = new mongoose.Schema(
     },
     walletProvider: String,
 
-    // Refund and Failure Logs
-    failureReason: String,
-    refundStatus: {
-      type: String,
-      enum: ["not_requested", "requested", "processed", "failed"],
-      default: "not_requested",
-    },
-    refundDate: Date,
   },
   {
     timestamps: true,

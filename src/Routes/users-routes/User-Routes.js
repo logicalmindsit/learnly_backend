@@ -1,5 +1,5 @@
 import express from "express";
-import { register, verifyOtp, createPassword ,login,logoutUser,forgotPassword,verifyForgotPasswordOtp,ForgotResetPassword, registerForm} from "../../Controllers/user-Controller/User-Auth-Controller.js"
+import { register, verifyOtp, createPassword ,login,logoutUser,forgotPassword,verifyForgotPasswordOtp,ForgotResetPassword, registerForm, resendOtp} from "../../Controllers/user-Controller/User-Auth-Controller.js"
 import multer from "multer";
 const router = express.Router();
 
@@ -8,6 +8,7 @@ const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 // Registration Flow
 router.post("/register", register);
+router.post("/resend-otp", resendOtp);
 router.post("/verify-otp", verifyOtp);
 router.post("/create-password", createPassword);
 

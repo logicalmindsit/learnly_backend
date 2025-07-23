@@ -1,3 +1,4 @@
+//Models/Course-Model/Course-model.js
 import mongoose from "mongoose";
 
 const MediaSchema = new mongoose.Schema(
@@ -41,6 +42,7 @@ const instructorSchema = new mongoose.Schema(
 
 const courseSchema = new mongoose.Schema(
   {
+    CourseMotherId: { type: String, required: true, unique: true },
     coursename: { type: String, required: true, unique: true },
     category: { type: String, required: true },
     courseduration: {

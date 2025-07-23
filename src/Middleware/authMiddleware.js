@@ -1,3 +1,4 @@
+//Middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
@@ -11,6 +12,7 @@ const verifyToken = async (req, res, next) => {
     if (
       PATH.startsWith("/register") ||
       PATH === "/verify-otp" ||
+      PATH === "/resend-otp" ||
       PATH === "/create-password" ||
       PATH === "/login" ||
       PATH === "/profile" ||
@@ -38,16 +40,6 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ message: "Access token not found" });
     }
     const decodedToken = jwt.verify(token, JWT_SECRET);
-    // const allowedRoles = ["admin", "hr", "projectManager","user","robotcontroller"];
-    // if (!allowedRoles.includes(decodedToken.role)) {
-    //   return res.status(403).json({ success: false, message: "Access denied. Insufficient permissions." });
-    // }
-    // console.log("users :", decodedToken);
-
-    // req.user = decodedToken;
-    // if (decodedToken.role !== 'admin') {
-    //   return res.status(403).json({ message: 'You do not have permission to access this resource.' });
-    // }
 
     console.log("user :", decodedToken);
     req.userId = decodedToken.id;
