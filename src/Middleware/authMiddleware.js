@@ -20,9 +20,8 @@ const verifyToken = async (req, res, next) => {
       PATH === "/password-otp-verify" ||
       PATH === "/forget-reset-password" ||
       PATH === "/allcourses" ||
-      PATH === "/courses/user-view" ||
-       /^\/courses\/[^\/]+$/.test(PATH) ||
-       PATH === "/form"
+      PATH === "/courses/user-view" || /^\/courses\/[^\/]+$/.test(PATH) ||
+      PATH === "/form"
     ) {
       return next();
     }
