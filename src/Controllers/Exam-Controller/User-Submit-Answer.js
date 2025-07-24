@@ -134,11 +134,13 @@ const user = await User.findById(userId).lean();
 };
 
 
+
 export const getUserExamAttempts = async (req, res) => {
   try {
-    const userId = req.userId; 
+    const userId = req.userId;
     const { courseId, examId, page = 1, limit = 10 } = req.query;
 
+    // 1. Validate courseId and examId
     if (courseId && !mongoose.Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({
         success: false,
@@ -152,33 +154,63 @@ export const getUserExamAttempts = async (req, res) => {
       });
     }
 
-   
+    // 2. Build query
     let query = { userId };
     if (courseId) query.courseId = courseId;
     if (examId) query.examId = examId;
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
-    const pageFinal = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum; 
-    const limitFinal = isNaN(limitNum) || limitNum < 1 ? 10 : limitNum; 
-
+    const pageFinal = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum;
+    const limitFinal = isNaN(limitNum) || limitNum < 1 ? 10 : limitNum;
 
     const skip = (pageFinal - 1) * limitFinal;
 
-
+    // 3. Fetch exam attempts
     const attempts = await ExamAttempt.find(query)
-      .sort({ attemptedAt: -1 }) 
+      .sort({ attemptedAt: -1 })
       .skip(skip)
-      .limit(limitFinal) 
-      .lean(); 
+      .limit(limitFinal)
+      .lean();
 
+    // 4. Fetch corresponding exam questions to include correct answers
+    const enrichedAttempts = await Promise.all(
+      attempts.map(async (attempt) => {
+        const exam = await ExamQuestion.findById(attempt.examId).lean();
+        if (!exam) {
+          return {
+            ...attempt,
+            answers: attempt.answers.map((ans) => ({
+              ...ans,
+              correctAnswer: null, // Exam not found, so no correct answer
+            })),
+          };
+        }
 
+        // Map answers to include the correct answer from the exam
+        const enrichedAnswers = attempt.answers.map((userAnswer) => {
+          const originalQuestion = exam.examQuestions.find(
+            (q) => q.question === userAnswer.question
+          );
+          return {
+            ...userAnswer,
+            correctAnswer: originalQuestion ? originalQuestion.correctAnswer : null,
+          };
+        });
+
+        return {
+          ...attempt,
+          answers: enrichedAnswers,
+        };
+      })
+    );
+
+    // 5. Get total count for pagination
     const totalCount = await ExamAttempt.countDocuments(query);
 
-
+    // 6. Set appropriate message
     let message;
     if (totalCount === 0) {
-
       if (examId) {
         message = "You have not attempted this exam.";
       } else if (courseId) {
@@ -186,33 +218,35 @@ export const getUserExamAttempts = async (req, res) => {
       } else {
         message = "You have not attempted any exams yet.";
       }
-    } else if (attempts.length === 0) {
-
+    } else if (enrichedAttempts.length === 0) {
       message = "No more exam attempts available for this page.";
     } else {
       message = "Exam attempts retrieved successfully.";
     }
 
+    // 7. Return response
     return res.status(200).json({
       success: true,
       message,
-      data: attempts,
+      data: enrichedAttempts,
       pagination: {
         currentPage: pageFinal,
         totalPages: Math.ceil(totalCount / limitFinal),
         totalItems: totalCount,
-        itemsPerPage: limitFinal
-      }
+        itemsPerPage: limitFinal,
+      },
     });
   } catch (error) {
     console.error("Error fetching exam attempts:", error);
     return res.status(500).json({
       success: false,
       message: "Something went wrong while fetching exam attempts.",
-      error: error.message
+      error: error.message,
     });
   }
 };
+
+
 
 
 
