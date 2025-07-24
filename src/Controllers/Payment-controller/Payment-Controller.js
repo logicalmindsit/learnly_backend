@@ -73,7 +73,7 @@ export const createPayment = async (req, res) => {
 
     const [user, course] = await Promise.all([
       User.findById(userId).select("username email mobile studentRegisterNumber").lean(),
-      CourseNewModel.findById(courseId).select("coursename price courseduration thumbnail CourseMotherId").lean(),
+      CourseNewModel.findById(courseId).select("coursename price courseduration thumbnail ").lean(),
     ]);
 
     if (!user) {
@@ -121,7 +121,7 @@ export const createPayment = async (req, res) => {
     const payment = new Payment({
       userId,
       courseId,
-      CourseMotherId: course.CourseMotherId,
+    
       studentRegisterNumber: user.studentRegisterNumber || "N/A",
       username: user.username,
       email: user.email || "N/A",
@@ -231,7 +231,7 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Payment record not found" });
     }
 
-    const course = await CourseNewModel.findById(updatedPayment.courseId).select("coursename price courseduration thumbnail   courseMotherId").lean();
+    const course = await CourseNewModel.findById(updatedPayment.courseId).select("coursename price courseduration thumbnail ").lean();
     const user = await User.findById(updatedPayment.userId).select("username email mobile studentRegisterNumber");
     if (!course || !user) {
       return res.status(404).json({ success: false, message: "Course/User not found" });
@@ -402,7 +402,7 @@ const createEmiPlan = async (userId, courseId, course, user, dueDay, emiDetails)
   const emiPlan = new EMIPlan({
     userId,
     courseId,
-    CourseMotherId: course.CourseMotherId,
+    
     coursename: course.coursename,
     coursePrice: course.price.finalPrice,
     courseduration: course.courseduration,

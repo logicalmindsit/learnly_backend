@@ -102,7 +102,7 @@ export const submitExamAttempt = async (req, res) => {
     // 7. Save Exam Attempt
     const attempt = new ExamAttempt({
       userId,
-      CourseMotherId: course.CourseMotherId || null, // Ensure CourseMotherId is included
+  
       studentRegisterNumber: user.studentRegisterNumber || null,
       email: user.email || null,
       username: user.username || null,
