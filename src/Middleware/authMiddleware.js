@@ -1,56 +1,58 @@
-//Middleware/authMiddleware.js
+
+// Middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
 dotenv.config();
 const { JWT_SECRET } = process.env;
 
+// List of public routes that do NOT require authentication
+const PUBLIC_ROUTES = [
+  "/register",
+  "/verify-otp",
+  "/resend-otp",
+  "/create-password",
+  "/login",
+  "/profile",
+  "/forget-password",
+  "/password-otp-verify",
+  "/forget-reset-password",
+  "/allcourses",
+  "/courses/user-view",
+  "/form",
+  "/courses/:id" // keep this only if route is not protected
+];
+
 const verifyToken = async (req, res, next) => {
   try {
     const PATH = req.path;
 
-    if (
-      PATH.startsWith("/register") ||
-      PATH === "/verify-otp" ||
-      PATH === "/resend-otp" ||
-      PATH === "/create-password" ||
-      PATH === "/login" ||
-      PATH === "/profile" ||
-      PATH === "/forget-password" ||
-      PATH === "/password-otp-verify" ||
-      PATH === "/forget-reset-password" ||
-      PATH === "/allcourses" ||
-      PATH === "/courses/user-view" || /^\/courses\/[^\/]+$/.test(PATH) ||
-      PATH === "/form"
-    ) {
+    // Bypass token verification for public routes
+    if (PUBLIC_ROUTES.includes(PATH)) {
       return next();
     }
 
-    const authorization = req.headers["authorization"];
+    const authHeader = req.headers["authorization"];
 
-    if (!authorization || !authorization.startsWith("Bearer ")) {
-      return res
-        .status(401)
-        .json({ message: "Authorization header not found" });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Authorization header not found or malformed" });
     }
 
-    const token = authorization.split(" ")[1];
-    //console.log(token)
-
+    const token = authHeader.split(" ")[1];
     if (!token) {
       return res.status(401).json({ message: "Access token not found" });
     }
-    const decodedToken = jwt.verify(token, JWT_SECRET);
 
-    console.log("user :", decodedToken);
-    req.userId = decodedToken.id;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.id;
 
     next();
   } catch (error) {
-    if (error?.name === "TokenExpiredError") {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({ message: "Access token has expired" });
     }
-    return res.status(403).json({ message: "Token verification failed" });
+    return res.status(403).json({ message: "Token verification failed", error: error.message });
   }
 };
+
 export { verifyToken };

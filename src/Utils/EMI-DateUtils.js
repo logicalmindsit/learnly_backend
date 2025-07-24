@@ -10,4 +10,3 @@ export const getNextDueDate = (startDate, dueDay, monthsOffset) => {
   const adjustedDay = Math.min(dueDay, lastDay);
   return new Date(nextDate.getFullYear(), nextDate.getMonth(), adjustedDay);
 };
-

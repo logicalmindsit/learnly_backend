@@ -13,7 +13,7 @@ export const getPurchasedCoursesByUser = async (req, res) => {
       paymentStatus: "completed",
     }).populate(
       "courseId",
-      "coursename thumbnail previewvedio price level instructor courseduration contentduration"
+      " CourseMotherId coursename thumbnail previewvedio price level instructor courseduration contentduration"
     );
 
     const purchasedCourses = payments
@@ -22,7 +22,7 @@ export const getPurchasedCoursesByUser = async (req, res) => {
         if (course) {
           return {
             courseId: course._id,
-           
+            CourseMotherId: course.CourseMotherId,
             coursename: course.coursename,
             thumbnail: course.thumbnail,
             previewvedio: course.previewvedio,

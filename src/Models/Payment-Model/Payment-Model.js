@@ -23,7 +23,7 @@ const paymentSchema = new mongoose.Schema(
     mobile: { type: String, index: true },
 
     // Course Information
-
+    CourseMotherId: { type: String, required: true},
     courseName: { type: String, required: true },
     // Payment Information
     paymentType: {type: String,enum: ["full", "emi", "emi_overdue"],required: true},

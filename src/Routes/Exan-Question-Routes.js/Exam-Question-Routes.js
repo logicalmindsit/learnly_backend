@@ -4,11 +4,7 @@ import {submitExamAttempt , getUserExamAttempts} from "../../Controllers/Exam-Co
 const router = express.Router();
 
 router.get("/exam-question", getExamQuestionsByCourseAndChapter);
-
-
 router.post("/user/exam/answer-submit", submitExamAttempt);
-
-
 router.get("/user/exam/result", getUserExamAttempts);
 
 export default router;

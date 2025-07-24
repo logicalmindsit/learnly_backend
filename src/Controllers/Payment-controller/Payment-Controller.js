@@ -38,6 +38,144 @@ const validatePaymentData = (data) => {
   return errors;
 };
 
+// export const createPayment = async (req, res) => {
+//   try {
+//     console.log("==> [createPayment] INIT");
+//     const userId = req.userId;
+//     const { courseId, amount, paymentMethod, paymentType, emiDueDay } = req.body;
+
+//     // Validate input data
+//     const validationErrors = validatePaymentData({ userId, courseId, amount });
+//     if (validationErrors.length > 0) {
+//       return res.status(400).json({ success: false, errors: validationErrors });
+//     }
+
+//     if (paymentType === "emi") {
+//       if (!emiDueDay || !Number.isInteger(emiDueDay) || emiDueDay < 1 || emiDueDay > 31) {
+//         return res.status(400).json({ success: false, message: "Invalid EMI due day (1-31)" });
+//       }
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(courseId)) {
+//       return res.status(400).json({ success: false, message: "Invalid course ID format" });
+//     }
+
+//     const isEnrolled = await User.exists({
+//       _id: userId,
+//       "enrolledCourses.course": courseId,
+//     });
+//     if (isEnrolled) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "User already enrolled in this course",
+//       });
+//     }
+
+//     const [user, course] = await Promise.all([
+//       User.findById(userId).select("username email mobile studentRegisterNumber").lean(),
+//       CourseNewModel.findById(courseId).select("coursename price courseduration thumbnail CourseMotherId").lean(),
+//     ]);
+
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: "User not found" });
+//     }
+//     if (!course) {
+//       return res.status(404).json({ success: false, message: "Course not found" });
+//     }
+
+//     let expectedAmount, emiDetails;
+//     if (paymentType === "emi") {
+//       emiDetails = validateCourseForEmi(course);
+//       expectedAmount = emiDetails.monthlyAmount;
+//       if (amount !== expectedAmount) {
+//         return res.status(400).json({
+//           success: false,
+//           message: `First EMI amount must be ₹${expectedAmount}`,
+//         });
+//       }
+//     } else {
+//       expectedAmount = course.price.finalPrice;
+//       if (amount !== expectedAmount) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Amount doesn't match course price",
+//         });
+//       }
+//     }
+
+//     const receiptId = `receipt_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+//     const razorpayOrder = await razorpay.orders.create({
+//       amount: Math.round(expectedAmount * 100),
+//       currency: "INR",
+//       receipt: receiptId,
+//       notes: {
+//         userId: userId.toString(),
+//         courseId: courseId.toString(),
+//         courseName: course.coursename,
+//         studentRegisterNumber: user.studentRegisterNumber || "N/A",
+//         email: user.email || "N/A",
+//         mobile: user.mobile || "N/A",
+//       },
+//     });
+
+//     const payment = new Payment({
+//       userId,
+//       courseId,
+//       CourseMotherId: course.CourseMotherId,
+//       studentRegisterNumber: user.studentRegisterNumber || "N/A",
+//       username: user.username,
+//       email: user.email || "N/A",
+//       mobile: user.mobile || "N/A",
+//       courseName: course.coursename,
+//       amount: expectedAmount,
+//       currency: "INR",
+//       transactionId: receiptId,
+//       paymentMethod,
+//       razorpayOrderId: razorpayOrder.id,
+//       ipAddress: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress,
+//       paymentStatus: "pending",
+//       paymentGateway: "razorpay",
+//       paymentType,
+//       emiDueDay: paymentType === "emi" ? emiDueDay : undefined,
+//       refundPolicyAcknowledged: true,
+//     });
+
+//     await payment.save();
+
+//     // Prepare response with course and EMI details
+//     const response = {
+//       success: true,
+//       message: "Payment order created successfully",
+//       order: razorpayOrder,
+//       paymentId: payment._id,
+//       courseDetails: {
+//         name: course.coursename,
+//         duration: course.courseduration,
+//         totalAmount: course.price.finalPrice,
+//         thumbnail: course.thumbnail || "https://yourwebsite.com/default-thumbnail.jpg",
+//         noRefundPolicy: "As per our policy, this course is non-refunded.",
+//       },
+//     };
+
+//     if (paymentType === "emi") {
+//       response.emiDetails = {
+//         monthlyAmount: emiDetails.monthlyAmount,
+//         totalEmis: emiDetails.months,
+//         nextDueDate: getNextDueDate(new Date(), emiDueDay, 1),
+//       };
+//     }
+
+//     return res.status(201).json(response);
+//   } catch (error) {
+//     console.error("==> [createPayment] Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create payment",
+//       error: error.message,
+//     });
+//   }
+// };
+
 export const createPayment = async (req, res) => {
   try {
     console.log("==> [createPayment] INIT");
@@ -60,6 +198,7 @@ export const createPayment = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid course ID format" });
     }
 
+    // Check if user is already enrolled
     const isEnrolled = await User.exists({
       _id: userId,
       "enrolledCourses.course": courseId,
@@ -73,7 +212,7 @@ export const createPayment = async (req, res) => {
 
     const [user, course] = await Promise.all([
       User.findById(userId).select("username email mobile studentRegisterNumber").lean(),
-      CourseNewModel.findById(courseId).select("coursename price courseduration thumbnail ").lean(),
+      CourseNewModel.findById(courseId).select("coursename price courseduration thumbnail CourseMotherId").lean(),
     ]);
 
     if (!user) {
@@ -103,7 +242,10 @@ export const createPayment = async (req, res) => {
       }
     }
 
+    // Generate a unique receipt ID
     const receiptId = `receipt_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    
+    // Create Razorpay order
     const razorpayOrder = await razorpay.orders.create({
       amount: Math.round(expectedAmount * 100),
       currency: "INR",
@@ -118,10 +260,11 @@ export const createPayment = async (req, res) => {
       },
     });
 
+    // Create payment record
     const payment = new Payment({
       userId,
       courseId,
-    
+      CourseMotherId: course.CourseMotherId,
       studentRegisterNumber: user.studentRegisterNumber || "N/A",
       username: user.username,
       email: user.email || "N/A",
@@ -129,7 +272,7 @@ export const createPayment = async (req, res) => {
       courseName: course.coursename,
       amount: expectedAmount,
       currency: "INR",
-      transactionId: receiptId,
+      transactionId: receiptId,  // This should be unique
       paymentMethod,
       razorpayOrderId: razorpayOrder.id,
       ipAddress: req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress,
@@ -142,7 +285,7 @@ export const createPayment = async (req, res) => {
 
     await payment.save();
 
-    // Prepare response with course and EMI details
+    // Prepare response
     const response = {
       success: true,
       message: "Payment order created successfully",
@@ -231,7 +374,7 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Payment record not found" });
     }
 
-    const course = await CourseNewModel.findById(updatedPayment.courseId).select("coursename price courseduration thumbnail ").lean();
+    const course = await CourseNewModel.findById(updatedPayment.courseId).select("coursename price courseduration thumbnail CourseMotherId");
     const user = await User.findById(updatedPayment.userId).select("username email mobile studentRegisterNumber");
     if (!course || !user) {
       return res.status(404).json({ success: false, message: "Course/User not found" });
@@ -402,7 +545,7 @@ const createEmiPlan = async (userId, courseId, course, user, dueDay, emiDetails)
   const emiPlan = new EMIPlan({
     userId,
     courseId,
-    
+    CourseMotherId: course.CourseMotherId,
     coursename: course.coursename,
     coursePrice: course.price.finalPrice,
     courseduration: course.courseduration,

@@ -30,6 +30,7 @@ const EMIPlanSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    CourseMotherId: { type: String, required: true },
     coursename: { type: String, required: true },
     coursePrice: { type: Number, required: true },
     courseduration: { type: String, required: true },

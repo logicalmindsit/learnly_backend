@@ -42,7 +42,7 @@ const instructorSchema = new mongoose.Schema(
 
 const courseSchema = new mongoose.Schema(
   {
-    CourseMotherId: { type: String, required: true, unique: true },
+    CourseMotherId: { type: String, required: true },
     coursename: { type: String, required: true, unique: true },
     category: { type: String, required: true },
     courseduration: {

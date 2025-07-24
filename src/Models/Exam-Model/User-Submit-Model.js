@@ -13,7 +13,7 @@ const ExamAttemptSchema = new mongoose.Schema({
   email: { type: String },
   username: { type: String },
   courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
-
+  CourseMotherId: { type: String, required: true },
   chapterTitle: { type: String, required: true },
   examId: { type: mongoose.Schema.Types.ObjectId, ref: "ExamQuestion", required: true },
   answers: [UserAnswerSchema],
