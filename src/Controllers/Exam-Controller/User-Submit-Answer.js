@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import User from "../../Models/User-Model/User-Model.js"
 
 
+// NO CHANGES IN THIS FUNCTION
 export const submitExamAttempt = async (req, res) => {
   try {
     const userId = req.userId;
@@ -64,9 +65,6 @@ const user = await User.findById(userId).lean();
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-
-
-      
     // 6. Process Answers
     let obtainedMarks = 0;
     const detailedAnswers = answers.map(userAnswer => {
@@ -96,11 +94,10 @@ const user = await User.findById(userId).lean();
     // 7. Save Exam Attempt
     const attempt = new ExamAttempt({
       userId,
-      CourseMotherId: course.CourseMotherId || null, // Ensure CourseMotherId is included 
+      CourseMotherId: course.CourseMotherId || null, 
       studentRegisterNumber: user.studentRegisterNumber || null,
       email: user.email || null,
       username: user.username || null,
-
       courseId,
       chapterTitle,
       examId,
@@ -134,27 +131,18 @@ const user = await User.findById(userId).lean();
 };
 
 
-
 export const getUserExamAttempts = async (req, res) => {
   try {
     const userId = req.userId;
     const { courseId, examId, page = 1, limit = 10 } = req.query;
 
-    // 1. Validate courseId and examId
     if (courseId && !mongoose.Types.ObjectId.isValid(courseId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid courseId."
-      });
+      return res.status(400).json({ success: false, message: "Invalid courseId." });
     }
     if (examId && !mongoose.Types.ObjectId.isValid(examId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid examId."
-      });
+      return res.status(400).json({ success: false, message: "Invalid examId." });
     }
 
-    // 2. Build query
     let query = { userId };
     if (courseId) query.courseId = courseId;
     if (examId) query.examId = examId;
@@ -163,17 +151,14 @@ export const getUserExamAttempts = async (req, res) => {
     const limitNum = parseInt(limit, 10);
     const pageFinal = isNaN(pageNum) || pageNum < 1 ? 1 : pageNum;
     const limitFinal = isNaN(limitNum) || limitNum < 1 ? 10 : limitNum;
-
     const skip = (pageFinal - 1) * limitFinal;
 
-    // 3. Fetch exam attempts
     const attempts = await ExamAttempt.find(query)
       .sort({ attemptedAt: -1 })
       .skip(skip)
       .limit(limitFinal)
       .lean();
 
-    // 4. Fetch corresponding exam questions to include correct answers
     const enrichedAttempts = await Promise.all(
       attempts.map(async (attempt) => {
         const exam = await ExamQuestion.findById(attempt.examId).lean();
@@ -182,22 +167,38 @@ export const getUserExamAttempts = async (req, res) => {
             ...attempt,
             answers: attempt.answers.map((ans) => ({
               ...ans,
-              correctAnswer: null, // Exam not found, so no correct answer
+              questionDetails: {
+                  question: ans.question,
+                  correctAnswer: "N/A",
+                  options: [ans.selectedAnswer]
+              }
             })),
           };
         }
 
-        // Map answers to include the correct answer from the exam
+        
         const enrichedAnswers = attempt.answers.map((userAnswer) => {
           const originalQuestion = exam.examQuestions.find(
             (q) => q.question === userAnswer.question
           );
+
+          // 1. We now return a new object with the `questionDetails` structure
           return {
-            ...userAnswer,
-            correctAnswer: originalQuestion ? originalQuestion.correctAnswer : null,
+            _id: userAnswer._id,
+            selectedAnswer: userAnswer.selectedAnswer,
+            isCorrect: userAnswer.isCorrect,
+            marksAwarded: userAnswer.marksAwarded,
+            
+            // 2. This new nested object contains all the original question info
+            questionDetails: {
+              question: originalQuestion ? originalQuestion.question : userAnswer.question,
+              correctAnswer: originalQuestion ? originalQuestion.correctAnswer : "N/A",
+              // 3. This is the most important part: We add the full options array
+              options: originalQuestion ? originalQuestion.options : [userAnswer.selectedAnswer],
+            }
           };
         });
-
+       
         return {
           ...attempt,
           answers: enrichedAnswers,
@@ -205,26 +206,15 @@ export const getUserExamAttempts = async (req, res) => {
       })
     );
 
-    // 5. Get total count for pagination
     const totalCount = await ExamAttempt.countDocuments(query);
 
-    // 6. Set appropriate message
     let message;
     if (totalCount === 0) {
-      if (examId) {
-        message = "You have not attempted this exam.";
-      } else if (courseId) {
-        message = "You have not attempted any exams for this course.";
-      } else {
         message = "You have not attempted any exams yet.";
-      }
-    } else if (enrichedAttempts.length === 0) {
-      message = "No more exam attempts available for this page.";
     } else {
-      message = "Exam attempts retrieved successfully.";
+        message = "Exam attempts retrieved successfully.";
     }
-
-    // 7. Return response
+    
     return res.status(200).json({
       success: true,
       message,
@@ -245,9 +235,3 @@ export const getUserExamAttempts = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-

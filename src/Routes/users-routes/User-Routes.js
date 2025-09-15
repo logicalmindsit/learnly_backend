@@ -1,11 +1,13 @@
 import express from "express";
-import { register, verifyOtp, createPassword ,login,logoutUser,forgotPassword,verifyForgotPasswordOtp,ForgotResetPassword, registerForm, resendOtp} from "../../Controllers/user-Controller/User-Auth-Controller.js"
+import { register, verifyOtp, createPassword ,login,logoutUser,forgotPassword,verifyForgotPasswordOtp,ForgotResetPassword, registerForm, resendOtp,completeRegistration} from "../../Controllers/user-Controller/User-Auth-Controller.js"
 import multer from "multer";
 const router = express.Router();
 
 
 // Configure multer for file upload
 const upload = multer({ dest: 'uploads/' });
+
+router.post("/complete-registration", upload.single('profilePicture'), completeRegistration);
 // Registration Flow
 router.post("/register", register);
 router.post("/resend-otp", resendOtp);

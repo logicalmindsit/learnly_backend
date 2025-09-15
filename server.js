@@ -1,4 +1,4 @@
-//server.js
+
 import express from 'express';
 import dotenv from "dotenv";
 import connectDB from './src/DB/db.js';
@@ -18,25 +18,35 @@ import './src/Services/EMI-Cron.js';
 const app = express();
 const PORT =  process.env.PORT || 8000;
 
-// Middleware 
+// Middleware
+dotenv.config(); // Move config to top
 app.use(cors());
 app.use(express.json());
-app.use(verifyToken);
-dotenv.config();
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+// ======================= CHANGES START HERE =======================
 
-
-//User Routes
+// STEP 1: PUBLIC ROUTES (No token required)
+// These routes are for login, registration, forgot password etc.
+// They MUST come BEFORE the verifyToken middleware.
 app.use("/", userRoutes);
+
+
+// STEP 2: APPLY SECURITY MIDDLEWARE
+// From this point onwards, all routes will require a valid token.
+app.use(verifyToken);
+
+
+// STEP 3: PROTECTED ROUTES (Token is required)
+// These routes can only be accessed by logged-in users.
 app.use("/", userProfileRoutes);
 app.use('/', courses);
 app.use('/', Payment);
-
-app.use("/",ExamQuestion)
+app.use("/", ExamQuestion)
 app.use('/', Purchasedcourse);
 
+// ======================= CHANGES END HERE =======================
 
 // Start the server
 app.listen(PORT, async () => {

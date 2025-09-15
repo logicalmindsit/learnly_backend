@@ -1,4 +1,3 @@
-
 import { sendOtpEmail } from "../../Utils/EmailTransport.js";
 import { sendOtpSMS } from "../../Utils/MobileTranspost.js";
 import User from "../../Models/User-Model/User-Model.js";
@@ -13,9 +12,45 @@ import bcrypt from "bcrypt";
 import AWS from "aws-sdk";
 import fs from "fs";
 import dotenv from "dotenv";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
 dotenv.config();
 
-//register user
+// Configure AWS S3
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// Upload File to S3
+export const uploadToS3 = async (file) => {
+  const key = `staff-profiles/${Date.now()}-${file.originalname}`;
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: fs.readFileSync(file.path),
+    ContentType: file.mimetype,
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    await s3.send(command);
+
+    return {
+      public_id: key,
+      url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`,
+    };
+  } catch (error) {
+    console.error("S3 Upload Error:", error);
+    throw error;
+  }
+};
+
+// Register new user
 export const register = async (req, res) => {
   try {
     console.log("Register function called", req.body);
@@ -60,19 +95,17 @@ export const register = async (req, res) => {
         message: "User  with these credentials already exists.",
       });
     }
+
     console.log("Generating OTP..");
-    const { otp, otpExpiresAt } = generateOtp();
-    console.log("Generated OTP:", otp, "Expires At:", otpExpiresAt);
-    const newUser = new User({
-      ...query,
-      registerOtp: otp,
-      registerOtpExpiresAt: otpExpiresAt,
-    });
+    // NOTE: We only need the OTP value now
+    const { otp } = generateOtp();
+    console.log("Generated OTP:", otp);
 
     const result = email
       ? await sendOtpEmail(email, otp)
       : await sendOtpSMS(mobile, otp);
     console.log("OTP sending result:", result);
+
     if (!result.success) {
       return res.status(400).json({
         success: false,
@@ -80,11 +113,14 @@ export const register = async (req, res) => {
       });
     }
 
-    await newUser.save();
-    console.log("New user saved:", newUser);
-    return res
-      .status(200)
-      .json({ success: true, message: `OTP sent to ${email || mobile}` });
+    // IMPORTANT: We REMOVED the user creation and user.save() logic here.
+
+    // NEW: Return the OTP in the response for frontend verification
+    return res.status(200).json({
+      success: true,
+      message: `OTP sent to ${email || mobile}`,
+      otp_for_verification: otp, // This is the new part!
+    });
   } catch (error) {
     console.error("Error during registration:", error);
     return res.status(500).json({
@@ -95,85 +131,187 @@ export const register = async (req, res) => {
   }
 };
 
-// resend otp
+// Complete registration after OTP verification
+export const completeRegistration = async (req, res) => {
+  try {
+    console.log("Complete Registration Request Body:", req.body);
+    console.log("Uploaded file:", req.file);
+
+    // 1. Extract ALL data from the request
+    const {
+      email,
+      mobile,
+      password,
+      username,
+      fatherName,
+      dateofBirth,
+      gender,
+      bloodGroup,
+      Nationality,
+      Occupation,
+      street,
+      city,
+      state,
+      country,
+      zipCode,
+    } = req.body;
+
+    // 2. Basic Validation for essential fields
+    if (!password || !username || !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Password, username, and profile picture are required.",
+      });
+    }
+    if (!email && !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Email or mobile is required.",
+      });
+    }
+    if (!isValidPassword(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be 8+ characters with a mix of uppercase, lowercase, number & special character.",
+      });
+    }
+
+    // 3. Check again if user already exists
+    const query = email ? { email } : { mobile };
+    const existingUser = await User.findOne(query);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "User with this email/mobile already exists.",
+      });
+    }
+
+    // 4. Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 5. Handle file upload to S3
+    let profilePictureData = null;
+    if (req.file) {
+      const result = await uploadToS3(req.file);
+      profilePictureData = result;
+      try {
+        fs.unlinkSync(req.file.path); // Clean up temporary file
+        console.log("Temporary file deleted");
+      } catch (cleanupError) {
+        console.error("Error deleting temp file:", cleanupError);
+      }
+    }
+
+    // 6. Create the new user with ALL data at once
+    const newUser = new User({
+      ...query,
+      password: hashedPassword,
+      username,
+      fatherName,
+      dateofBirth: dateofBirth ? new Date(dateofBirth) : null,
+      gender,
+      bloodGroup,
+      Nationality,
+      Occupation,
+      address: { street, city, state, country, zipCode },
+      profilePicture: profilePictureData,
+      registerOtpVerified: true, // Mark as verified since they completed the flow
+    });
+
+    // 7. Save the user to the database
+    await newUser.save();
+    console.log("New user successfully created and saved:", newUser);
+
+    return res.status(201).json({
+      // 201 Created status
+      success: true,
+      message: "Registration complete! Welcome.",
+      user: {
+        id: newUser._id,
+        email: newUser.email,
+        username: newUser.username,
+      },
+    });
+  } catch (error) {
+    console.error("Error during complete registration:", error);
+    if (req.file?.path) {
+      try {
+        fs.unlinkSync(req.file.path); // Cleanup file on error
+      } catch (cleanupError) {
+        console.error("Error deleting temp file on failure:", cleanupError);
+      }
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error during registration.",
+      error: error.message,
+    });
+  }
+};
+
+// Resend OTP for registration
 export const resendOtp = async (req, res) => {
   try {
     console.log("Resend OTP function called", req.body);
     const { email, mobile } = req.body;
-    console.log("Resend OTP Request Body:", req.body);
 
+    // --- Keep validation logic ---
     if (email && !isValidEmail(email)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid email format." });
     }
-
     if (mobile && !isValidMobile(mobile)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid mobile number format. Include country code.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid mobile number format." });
     }
-
     if (!email && !mobile) {
       return res
         .status(400)
         .json({ success: false, message: "Email or mobile is required." });
     }
+    // --- End of validation ---
 
-    if (email && mobile) {
-      return res.status(400).json({
-        success: false,
-        message: "Provide only one: email or mobile.",
-      });
-    }
-
-    console.log("Checking if user exists for resend OTP");
+    // IMPORTANT: We will still check if the user exists. This is good practice.
+    // If someone is trying to resend OTP for an email that is already fully registered,
+    // we should let them know.
     const query = email ? { email } : { mobile };
-    console.log("Querying for existing user with:", query);
     const existingUser = await User.findOne(query);
 
-    if (!existingUser) {
-      console.log("User does not exist");
-      return res.status(404).json({
+    if (existingUser) {
+      // The user already exists in the DB, meaning they are a registered user.
+      // It's better to guide them to login or forgot password.
+      return res.status(409).json({
         success: false,
-        message: "User not found. Please register first.",
+        message:
+          "An account with this email/mobile already exists. Please login.",
       });
     }
 
-    // Check if user is already verified
-    if (existingUser.isOtpVerified) {
-      return res.status(400).json({
-        success: false,
-        message: "User is already verified.",
-      });
-    }
-
-    console.log("Generating new OTP..");
-    const { otp, otpExpiresAt } = generateOtp();
-    console.log("Generated OTP:", otp, "Expires At:", otpExpiresAt);
-    
-    // Update user with new OTP
-    existingUser.registerOtp = otp;
-    existingUser.registerOtpExpiresAt = otpExpiresAt;
+    // If user does NOT exist, we proceed to send a new OTP, just like the 'register' function.
+    console.log("Generating new OTP for a fresh registration attempt...");
+    const { otp } = generateOtp();
+    console.log("Generated new OTP:", otp);
 
     const result = email
       ? await sendOtpEmail(email, otp)
       : await sendOtpSMS(mobile, otp);
-    console.log("OTP sending result:", result);
-    
+
     if (!result.success) {
       return res.status(400).json({
         success: false,
-        message: `Failed to send OTP. ${result.message}`,
+        message: `Failed to resend OTP. ${result.message}`,
       });
     }
 
-    await existingUser.save();
-    console.log("Updated user with new OTP:", existingUser);
-    return res
-      .status(200)
-      .json({ success: true, message: `New OTP sent to ${email || mobile}` });
+    // Just like 'register', we send the new OTP back to the frontend
+    return res.status(200).json({
+      success: true,
+      message: `New OTP sent to ${email || mobile}`,
+      otp_for_verification: otp, // Send the new OTP back
+    });
   } catch (error) {
     console.error("Error during OTP resend:", error);
     return res.status(500).json({
@@ -184,6 +322,7 @@ export const resendOtp = async (req, res) => {
   }
 };
 
+// Verify OTP for registration
 export const verifyOtp = async (req, res) => {
   const { email, mobile, otp } = req.body;
   console.log("Verify OTP Request Body:", req.body);
@@ -248,6 +387,7 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
+// Create password after OTP verification
 export const createPassword = async (req, res) => {
   try {
     const { email, mobile, password } = req.body;
@@ -307,39 +447,7 @@ export const createPassword = async (req, res) => {
   }
 };
 
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
-
-export const uploadToS3 = async (file) => {
-  const key = `staff-profiles/${Date.now()}-${file.originalname}`;
-  
-  const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: key,
-    Body: fs.readFileSync(file.path),
-    ContentType: file.mimetype,
-  };
-
-  try {
-    const command = new PutObjectCommand(params);
-    await s3.send(command);
-    
-    return {
-      public_id: key,
-      url: `https://${params.Bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
-    };
-  } catch (error) {
-    console.error("S3 Upload Error:", error);
-    throw error;
-  }
-};
+// Register Form Submission
 export const registerForm = async (req, res) => {
   try {
     console.log("Register Form Request Body:", req.body);
@@ -491,6 +599,7 @@ export const registerForm = async (req, res) => {
   }
 };
 
+// Login user
 export const login = async (req, res) => {
   const { email, mobile, password } = req.body;
   console.log("Login Request Body:", req.body);
@@ -666,6 +775,7 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
+// Verify OTP for forgot password
 export const verifyForgotPasswordOtp = async (req, res) => {
   try {
     console.debug("[VerifyForgotPasswordOTP] Request received:", req.body);
@@ -749,6 +859,7 @@ export const verifyForgotPasswordOtp = async (req, res) => {
   }
 };
 
+// Reset password after OTP verification
 export const ForgotResetPassword = async (req, res) => {
   try {
     console.debug("[ResetPassword] Request received:", req.body);
