@@ -142,5 +142,12 @@ userSchema.pre("save", async function (next) {
     next(err);
   }
 });
+
+// ===== Additional Indexes for Performance ===== //
+userSchema.index({ role: 1 }); // For role-based queries
+userSchema.index({ status: 1 }); // For status-based queries
+userSchema.index({ lastActivity: -1 }); // For recent activity
+userSchema.index({ createdAt: -1 }); // For recent users
+
 const User = model("User", userSchema);
 export default User;

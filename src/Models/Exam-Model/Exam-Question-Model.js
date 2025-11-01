@@ -9,8 +9,8 @@ const QuestionItemSchema = new mongoose.Schema({
 
 const ExamSchema = new mongoose.Schema(
   {
-    coursename: { type: String, required: true, index: true },        
-    chapterTitle: { type: String, required: true, index: true },     
+    coursename: { type: String, required: true, index: true },
+    chapterTitle: { type: String, required: true, index: true },
     examinationName: { type: String, required: true, index: true },
     subject: { type: String, required: true, index: true },
     totalMarks: { type: Number, required: true },
@@ -21,6 +21,10 @@ const ExamSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// ===== Indexes for Performance ===== //
+ExamSchema.index({ uploadDate: -1 }); // For recent exams
+ExamSchema.index({ totalMarks: 1 }); // For filtering by marks
 
 const ExamQuestion = mongoose.model("ExamQuestion", ExamSchema);
 export default ExamQuestion;

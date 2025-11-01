@@ -18,18 +18,43 @@ const paymentSchema = new mongoose.Schema(
 
     // Basic Metadata
     username: { type: String, required: true },
-    studentRegisterNumber: {type: String,index: true},
-    email: { type: String, index: true }, 
+    studentRegisterNumber: { type: String, index: true },
+    email: { type: String, index: true },
     mobile: { type: String, index: true },
 
     // Course Information
-    CourseMotherId: { type: String, required: true},
+    CourseMotherId: { type: String, required: true },
     courseName: { type: String, required: true },
     // Payment Information
-    paymentType: {type: String,enum: ["full", "emi", "emi_overdue"],required: true},
-    emiDueDay: {type: Number,min: 1,max: 31},
-    amount: { type: Number, required: true,
-    min: 0,set: v => parseFloat(v.toFixed(2))
+    paymentType: {
+      type: String,
+      enum: ["full", "emi", "emi_overdue", "emi_installment", "one-time"],
+      required: true,
+    },
+    emiDueDay: { type: Number, min: 1, max: 31 },
+
+    // EMI Payment Tracking
+    emiPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EMIPlan",
+      index: true,
+    },
+    emiInstallments: [
+      {
+        emiId: { type: mongoose.Schema.Types.ObjectId },
+        month: { type: Number },
+        monthName: { type: String },
+        amount: { type: Number },
+        dueDate: { type: Date },
+        wasOverdue: { type: Boolean, default: false },
+      },
+    ],
+
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+      set: (v) => parseFloat(v.toFixed(2)),
     },
     currency: {
       type: String,
@@ -40,7 +65,7 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "completed", "failed", "cancelled"],
       default: "pending",
-      index: true
+      index: true,
     },
     transactionId: {
       type: String,
@@ -49,7 +74,20 @@ const paymentSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["UPI","CARD","DEBIT_CARD","CREDIT_CARD","NETBANKING","WALLET","EMI","COD","PAYLATER","BANK_TRANSFER","QR_CODE","AUTO_DEBIT"],
+      enum: [
+        "UPI",
+        "CARD",
+        "DEBIT_CARD",
+        "CREDIT_CARD",
+        "NETBANKING",
+        "WALLET",
+        "EMI",
+        "COD",
+        "PAYLATER",
+        "BANK_TRANSFER",
+        "QR_CODE",
+        "AUTO_DEBIT",
+      ],
       required: true,
     },
     paymentGateway: {
@@ -78,8 +116,8 @@ const paymentSchema = new mongoose.Schema(
 
     // Optional Gateway Details
     cardDetails: {
-      cardBrand: String,   // VISA, MasterCard, etc.
-      last4: String,       // Last 4 digits of card
+      cardBrand: String, // VISA, MasterCard, etc.
+      last4: String, // Last 4 digits of card
       bank: String,
     },
     upiDetails: {
@@ -92,12 +130,16 @@ const paymentSchema = new mongoose.Schema(
       ifscCode: String,
     },
     walletProvider: String,
-
   },
   {
     timestamps: true,
   }
 );
+
+// ===== Additional Indexes for Performance ===== //
+paymentSchema.index({ courseId: 1 }); // For course-specific payments
+paymentSchema.index({ paymentType: 1, paymentStatus: 1 }); // For payment type and status queries
+paymentSchema.index({ createdAt: -1 }); // For recent payments
 
 const Payment = mongoose.model("Payment", paymentSchema);
 export default Payment;

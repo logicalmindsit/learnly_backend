@@ -25,8 +25,8 @@ const chapterSchema = new mongoose.Schema(
     lessons: [lessonSchema],
     exam: {
       type: mongoose.Schema.Types.ObjectId,
-      ref:"ExamQuestion"
-    }
+      ref: "ExamQuestion",
+    },
   },
   { timestamps: true }
 );
@@ -36,6 +36,17 @@ const instructorSchema = new mongoose.Schema(
     name: { type: String, required: true },
     role: String,
     socialmedia_id: String,
+  },
+  { _id: false }
+);
+// EMI Schema (for students)
+const emiSchema = new mongoose.Schema(
+  {
+    isAvailable: { type: Boolean, default: false }, // whether EMI is available
+    emiDurationMonths: { type: Number, default: null }, // e.g. 6, 12, 24 months
+    monthlyAmount: { type: Number }, // admin defined monthly emi amount
+    totalAmount: { type: Number }, // total amount to be paid via EMI
+    notes: { type: String }, // admin remarks or conditions
   },
   { _id: false }
 );
@@ -63,6 +74,7 @@ const courseSchema = new mongoose.Schema(
       discount: { type: Number, default: 0, min: 0, max: 100 },
       finalPrice: { type: Number },
     },
+    emi: emiSchema,
     level: {
       type: String,
       enum: ["beginner", "medium", "hard"],
@@ -96,4 +108,12 @@ courseSchema.pre("save", function (next) {
   }
   next();
 });
+
+// ===== Indexes for Performance ===== //
+courseSchema.index({ category: 1, level: 1, language: 1 }); // For filtering courses by category, level, language
+courseSchema.index({ studentEnrollmentCount: -1 }); // For sorting popular courses
+courseSchema.index({ "price.finalPrice": 1 }); // For sorting by price
+courseSchema.index({ rating: -1 }); // For sorting by rating
+courseSchema.index({ createdAt: -1 }); // For recent courses
+
 export default mongoose.model("Course", courseSchema);

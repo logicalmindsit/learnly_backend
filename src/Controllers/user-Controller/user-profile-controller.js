@@ -32,6 +32,68 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
+// 🟢 Get User's Enrolled Courses
+export const getUserEnrolledCourses = async (req, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: User not authenticated",
+      });
+    }
+
+    // Get user with enrolled courses populated
+    const user = await User.findById(userId)
+      .populate({
+        path: "enrolledCourses.course",
+        select:
+          "CourseMotherId coursename courseduration thumbnail price category level language instructor",
+      })
+      .populate({
+        path: "enrolledCourses.emiPlan",
+        select: "status emis totalAmount emiPeriod selectedDueDay startDate",
+      });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Format the enrolled courses data
+    const enrolledCourses = user.enrolledCourses.map((enrollment) => ({
+      _id: enrollment.course._id,
+      CourseMotherId: enrollment.course.CourseMotherId,
+      coursename: enrollment.course.coursename,
+      courseduration: enrollment.course.courseduration,
+      thumbnail: enrollment.course.thumbnail,
+      price: enrollment.course.price,
+      category: enrollment.course.category,
+      level: enrollment.course.level,
+      language: enrollment.course.language,
+      instructor: enrollment.course.instructor,
+      emiPlan: enrollment.emiPlan,
+      accessStatus: enrollment.accessStatus,
+      enrolledAt: enrollment.enrolledAt || user.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Enrolled courses fetched successfully",
+      data: enrolledCourses,
+    });
+  } catch (error) {
+    console.error("Error fetching enrolled courses:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
 // 🟡 Update User Profile Details (except profile picture)
 export const updateUserProfile = async (req, res) => {
   try {
@@ -72,22 +134,28 @@ export const updateUserProfile = async (req, res) => {
       if (existingUserWithEmail) {
         return res
           .status(400)
-          .json({ success: false, message: "Email already in use by another account" });
+          .json({
+            success: false,
+            message: "Email already in use by another account",
+          });
       }
     }
-    
+
     // Optional: Check if the new username already exists for another user
     if (username) {
-        const existingUserWithUsername = await User.findOne({
-          username: username,
-          _id: { $ne: userId }, // Exclude current user
-        });
-        if (existingUserWithUsername) {
-          return res
-            .status(400)
-            .json({ success: false, message: "Username already in use by another account" });
-        }
+      const existingUserWithUsername = await User.findOne({
+        username: username,
+        _id: { $ne: userId }, // Exclude current user
+      });
+      if (existingUserWithUsername) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Username already in use by another account",
+          });
       }
+    }
 
     const updateData = {
       username,
@@ -103,18 +171,23 @@ export const updateUserProfile = async (req, res) => {
     };
 
     // Remove undefined fields so they don't overwrite existing data with nulls if not provided
-    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+    Object.keys(updateData).forEach(
+      (key) => updateData[key] === undefined && delete updateData[key]
+    );
     if (updateData.address && Object.keys(updateData.address).length === 0) {
-        delete updateData.address; // Don't send empty address object unless intended
+      delete updateData.address; // Don't send empty address object unless intended
     } else if (updateData.address) {
-        Object.keys(updateData.address).forEach(key => updateData.address[key] === undefined && delete updateData.address[key]);
+      Object.keys(updateData.address).forEach(
+        (key) =>
+          updateData.address[key] === undefined &&
+          delete updateData.address[key]
+      );
     }
-
 
     const updatedUser = await User.findByIdAndUpdate(
       userId, // Find user by ID
       { $set: updateData }, // Update specified fields
-      { new: true, runValidators: true, context: 'query' } // Options
+      { new: true, runValidators: true, context: "query" } // Options
     ).select("-password");
 
     if (!updatedUser) {
@@ -131,11 +204,24 @@ export const updateUserProfile = async (req, res) => {
   } catch (error) {
     console.error("Error updating profile:", error);
     // Handle Mongoose validation errors (e.g., unique constraint)
-    if (error.name === 'ValidationError') {
-        return res.status(400).json({ success: false, message: "Validation failed", errors: error.errors });
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Validation failed",
+          errors: error.errors,
+        });
     }
-    if (error.code === 11000) { // MongoDB duplicate key error
-        return res.status(400).json({ success: false, message: "Email or username already exists.", error: error.message });
+    if (error.code === 11000) {
+      // MongoDB duplicate key error
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Email or username already exists.",
+          error: error.message,
+        });
     }
     res.status(500).json({
       success: false,
@@ -152,7 +238,9 @@ export const updateProfilePicture = async (req, res) => {
 
     if (!req.userId) {
       console.log("⚠️ User ID not provided");
-      return res.status(401).json({ message: "Unauthorized: User not authenticated" });
+      return res
+        .status(401)
+        .json({ message: "Unauthorized: User not authenticated" });
     }
 
     if (!req.file) {
@@ -176,7 +264,9 @@ export const updateProfilePicture = async (req, res) => {
 
     if (!updatedUser) {
       console.log("❌ User not found during profile picture update");
-      return res.status(404).json({ message: "User not found, cannot update profile picture" });
+      return res
+        .status(404)
+        .json({ message: "User not found, cannot update profile picture" });
     }
 
     // ✅ Remove local file after success
@@ -194,9 +284,10 @@ export const updateProfilePicture = async (req, res) => {
       message: "Profile picture updated",
       profilePicture: updatedUser.profilePicture,
     });
-
   } catch (error) {
     console.error("🔥 Error updating profile picture:", error);
-    res.status(500).json({ message: "Failed to upload photo", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to upload photo", error: error.message });
   }
 };
